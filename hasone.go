@@ -133,9 +133,10 @@ var NotFoundHasOneError = fmt.Errorf("NotFoundHasOne")
 
 func (l *hasOneLoadableImpl[ParentID, Parent, NodeID, Node]) GetLoaded() ([]Node, error) {
 	res := []Node{}
-	for _, v := range l.values.Iter() {
+	l.values.Range(func(_ ParentID, v Node) bool {
 		res = append(res, v)
-	}
+		return true
+	})
 
 	return res, nil
 }

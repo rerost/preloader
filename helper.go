@@ -1,9 +1,5 @@
 package preloader
 
-import (
-	"context"
-)
-
 // LoadableKey is a type used to create unique keys for loadable types
 type LoadableKey string
 

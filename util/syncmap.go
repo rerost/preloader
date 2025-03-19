@@ -1,7 +1,6 @@
 package util
 
 import (
-	"iter"
 	"sync"
 )
 
@@ -22,10 +21,9 @@ func (m *SyncMap[K, V]) Store(key K, value V) {
 	m.m.Store(key, value)
 }
 
-func (m *SyncMap[K, V]) Iter() iter.Seq2[K, V] {
-	return func(yield func(K, V) bool) {
-		m.m.Range(func(key, value any) bool {
-			return yield(key.(K), value.(V))
-		})
-	}
+// Range calls f sequentially for each key and value in the map
+func (m *SyncMap[K, V]) Range(f func(key K, value V) bool) {
+	m.m.Range(func(key, value any) bool {
+		return f(key.(K), value.(V))
+	})
 }

@@ -1,7 +1,6 @@
 package preloader
 
 import (
-	"context"
 	"sync"
 )
 

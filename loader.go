@@ -129,9 +129,10 @@ func (l *loadableImpl[ParentID, Parent, NodeID, Node]) Preload(ctx context.Conte
 
 func (l *loadableImpl[ParentID, Parent, NodeID, Node]) GetLoaded() ([]Node, error) {
 	res := []Node{}
-	for _, vs := range l.values.Iter() {
+	l.values.Range(func(_ ParentID, vs []Node) bool {
 		res = append(res, vs...)
-	}
+		return true
+	})
 
 	return res, nil
 }
