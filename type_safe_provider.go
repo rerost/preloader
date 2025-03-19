@@ -1,9 +1,14 @@
 package preloader
 
 import (
-	"fmt"
 	"sync"
 )
+
+// Registered is a phantom type used to mark loadables as registered
+type Registered struct{}
+
+// NotRegistered is a phantom type used to mark loadables as not registered
+type NotRegistered struct{}
 
 // LoadableKey is a type used to create unique keys for loadable types
 type LoadableKey string
@@ -11,111 +16,89 @@ type LoadableKey string
 // TypedLoadableProvider is a type-safe version of LoadableProvider
 // It uses compile-time checks to ensure loadables are registered
 type TypedLoadableProvider struct {
-	provider     interface{}
-	registeredKeys map[LoadableKey]bool
-	mu          sync.RWMutex
+	loadables map[string]interface{}
+	mu        sync.RWMutex
 }
 
 // NewTypedLoadableProvider creates a new TypedLoadableProvider
 func NewTypedLoadableProvider() *TypedLoadableProvider {
 	return &TypedLoadableProvider{
-		provider:     make(map[string]interface{}),
-		registeredKeys: make(map[LoadableKey]bool),
+		loadables: make(map[string]interface{}),
 	}
 }
 
-// RegisterLoadable registers a loadable with the provider
-func (p *TypedLoadableProvider) RegisterLoadable(typeName string, loadable interface{}) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.provider.(map[string]interface{})[typeName] = loadable
+// RegisteredLoadable is a type that represents a registered loadable
+// The R type parameter is used to encode the registration status
+type RegisteredLoadable[R any, ParentID comparable, Parent Resource[ParentID], NodeID comparable, Node Resource[NodeID]] struct {
+	Key      LoadableKey
+	Loadable Loadable[ParentID, Parent, NodeID, Node]
 }
 
-// GetLoadable retrieves a loadable from the provider
-func (p *TypedLoadableProvider) GetLoadable(typeName string) interface{} {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.provider.(map[string]interface{})[typeName]
+// RegisteredHasOneLoadable is a type that represents a registered has-one loadable
+// The R type parameter is used to encode the registration status
+type RegisteredHasOneLoadable[R any, ParentID comparable, Parent Resource[ParentID], NodeID comparable, Node Resource[NodeID]] struct {
+	Key      LoadableKey
+	Loadable HasOneLoadable[ParentID, Parent, NodeID, Node]
 }
 
-// RegisterTypedLoadable registers a typed loadable with the provider
-func RegisterTypedLoadable[ParentID comparable, Parent Resource[ParentID], NodeID comparable, Node Resource[NodeID]](
+// RegisterLoadable registers a loadable and returns a RegisteredLoadable with Registered type
+func RegisterLoadable[ParentID comparable, Parent Resource[ParentID], NodeID comparable, Node Resource[NodeID]](
 	p *TypedLoadableProvider,
 	key LoadableKey,
 	loadable Loadable[ParentID, Parent, NodeID, Node],
-) {
+) RegisteredLoadable[Registered, ParentID, Parent, NodeID, Node] {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.provider.(map[string]interface{})[string(key)] = loadable
-	p.registeredKeys[key] = true
+	p.loadables[string(key)] = loadable
+	return RegisteredLoadable[Registered, ParentID, Parent, NodeID, Node]{
+		Key:      key,
+		Loadable: loadable,
+	}
 }
 
-// RegisterTypedHasOneLoadable registers a typed has-one loadable with the provider
-func RegisterTypedHasOneLoadable[ParentID comparable, Parent Resource[ParentID], NodeID comparable, Node Resource[NodeID]](
+// RegisterHasOneLoadable registers a has-one loadable and returns a RegisteredHasOneLoadable with Registered type
+func RegisterHasOneLoadable[ParentID comparable, Parent Resource[ParentID], NodeID comparable, Node Resource[NodeID]](
 	p *TypedLoadableProvider,
 	key LoadableKey,
 	loadable HasOneLoadable[ParentID, Parent, NodeID, Node],
-) {
+) RegisteredHasOneLoadable[Registered, ParentID, Parent, NodeID, Node] {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.provider.(map[string]interface{})[string(key)] = loadable
-	p.registeredKeys[key] = true
+	p.loadables[string(key)] = loadable
+	return RegisteredHasOneLoadable[Registered, ParentID, Parent, NodeID, Node]{
+		Key:      key,
+		Loadable: loadable,
+	}
 }
 
-// MustGetLoadable retrieves a typed loadable from the provider
-// It will panic if the loadable is not registered or has the wrong type
-func MustGetLoadable[ParentID comparable, Parent Resource[ParentID], NodeID comparable, Node Resource[NodeID]](
+// GetLoadable retrieves a loadable from the provider
+// This function is used internally and should not be called directly
+func (p *TypedLoadableProvider) GetLoadable(key string) interface{} {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.loadables[key]
+}
+
+// GetRegisteredLoadable retrieves a registered loadable
+// This function requires a RegisteredLoadable with Registered type
+func GetRegisteredLoadable[ParentID comparable, Parent Resource[ParentID], NodeID comparable, Node Resource[NodeID]](
 	p *TypedLoadableProvider,
-	key LoadableKey,
+	registered RegisteredLoadable[Registered, ParentID, Parent, NodeID, Node],
 ) Loadable[ParentID, Parent, NodeID, Node] {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
-	// Check if the key is registered
-	if _, ok := p.registeredKeys[key]; !ok {
-		panic(fmt.Sprintf("Loadable with key %s is not registered", key))
-	}
-	
-	// Get the loadable from the provider
-	loadable := p.provider.(map[string]interface{})[string(key)]
-	if loadable == nil {
-		panic(fmt.Sprintf("Loadable with key %s is nil", key))
-	}
-	
-	// Type assertion
-	typedLoadable, ok := loadable.(Loadable[ParentID, Parent, NodeID, Node])
-	if !ok {
-		panic(fmt.Sprintf("Type mismatch for loadable with key %s", key))
-	}
-	
-	return typedLoadable
+	loadable := p.loadables[string(registered.Key)]
+	return loadable.(Loadable[ParentID, Parent, NodeID, Node])
 }
 
-// MustGetHasOneLoadable retrieves a typed has-one loadable from the provider
-// It will panic if the loadable is not registered or has the wrong type
-func MustGetHasOneLoadable[ParentID comparable, Parent Resource[ParentID], NodeID comparable, Node Resource[NodeID]](
+// GetRegisteredHasOneLoadable retrieves a registered has-one loadable
+// This function requires a RegisteredHasOneLoadable with Registered type
+func GetRegisteredHasOneLoadable[ParentID comparable, Parent Resource[ParentID], NodeID comparable, Node Resource[NodeID]](
 	p *TypedLoadableProvider,
-	key LoadableKey,
+	registered RegisteredHasOneLoadable[Registered, ParentID, Parent, NodeID, Node],
 ) HasOneLoadable[ParentID, Parent, NodeID, Node] {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
-	// Check if the key is registered
-	if _, ok := p.registeredKeys[key]; !ok {
-		panic(fmt.Sprintf("HasOneLoadable with key %s is not registered", key))
-	}
-	
-	// Get the loadable from the provider
-	loadable := p.provider.(map[string]interface{})[string(key)]
-	if loadable == nil {
-		panic(fmt.Sprintf("HasOneLoadable with key %s is nil", key))
-	}
-	
-	// Type assertion
-	typedLoadable, ok := loadable.(HasOneLoadable[ParentID, Parent, NodeID, Node])
-	if !ok {
-		panic(fmt.Sprintf("Type mismatch for HasOneLoadable with key %s", key))
-	}
-	
-	return typedLoadable
+	loadable := p.loadables[string(registered.Key)]
+	return loadable.(HasOneLoadable[ParentID, Parent, NodeID, Node])
 }

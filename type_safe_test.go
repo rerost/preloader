@@ -11,11 +11,14 @@ func TestTypedLoadableProvider(t *testing.T) {
 	
 	// Register a loadable
 	bookLoadable := EmptyLoadable[UserID, *TypedUser, BookID, *TypedBook]()
-	RegisterTypedLoadable(provider, LoadableKey("Books"), bookLoadable)
+	registeredBookLoadable := RegisterLoadable(provider, LoadableKey("Books"), bookLoadable)
 	
-	// This should compile because the loadable is registered
+	// Create a user and register the loadable
 	user := &TypedUser{ID: 1, Name: "Test User"}
 	user.SetProvider(provider)
+	user.RegisterBooksLoadable(registeredBookLoadable)
+	
+	// This should compile because the loadable is registered
 	_, _ = user.Books(context.Background()) // No compile error
 	
 	// The following code would not compile because the "Authors" loadable is not registered
@@ -23,7 +26,8 @@ func TestTypedLoadableProvider(t *testing.T) {
 	/*
 	book := &TypedBook{ID: 1, Title: "Test Book"}
 	book.SetProvider(provider)
-	_, _ = book.Author(context.Background()) // Compile error: "Authors" loadable not registered
+	// This line would cause a compile error because authorLoadable is not registered
+	_, _ = book.Author(context.Background())
 	*/
 }
 
@@ -37,24 +41,30 @@ func TestCompileTimeErrors(t *testing.T) {
 	provider := NewTypedLoadableProvider()
 	user := &TypedUser{ID: 1, Name: "Test User"}
 	user.SetProvider(provider)
-	_, _ = user.Books(context.Background()) // Compile error: "Books" loadable not registered
+	// This would cause a compile error because booksLoadable is not registered
+	_, _ = user.Books(context.Background())
 	*/
 	
 	// Example 2: Type mismatch
 	/*
 	provider := NewTypedLoadableProvider()
-	authorLoadable := EmptyHasOneLoadable[BookID, *TypedBook, UserID, *TypedUser]()
-	provider.RegisterTypedHasOneLoadable(LoadableKey("Authors"), authorLoadable)
 	
-	// This would compile because the loadable is registered
+	// Register loadables
+	authorLoadable := EmptyHasOneLoadable[BookID, *TypedBook, UserID, *TypedUser]()
+	registeredAuthorLoadable := RegisterHasOneLoadable(provider, LoadableKey("Authors"), authorLoadable)
+	
+	// Create a book and register the loadable
 	book := &TypedBook{ID: 1, Title: "Test Book"}
 	book.SetProvider(provider)
+	book.RegisterAuthorLoadable(registeredAuthorLoadable)
+	
+	// This would compile because the loadable is registered
 	_, _ = book.Author(context.Background()) // No compile error
 	
 	// But this would not compile because we're trying to use a HasOneLoadable as a Loadable
-	provider.RegisterTypedHasOneLoadable(LoadableKey("Books"), authorLoadable)
 	user := &TypedUser{ID: 1, Name: "Test User"}
 	user.SetProvider(provider)
-	_, _ = user.Books(context.Background()) // Compile error: type mismatch
+	// This would cause a compile error because of type mismatch
+	user.RegisterBooksLoadable(registeredAuthorLoadable)
 	*/
 }

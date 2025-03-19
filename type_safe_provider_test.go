@@ -10,10 +10,10 @@ func TestTypedLoadableProviderRegistration(t *testing.T) {
 	
 	// Register a loadable
 	bookLoadable := EmptyLoadable[UserID, *TypedUser, BookID, *TypedBook]()
-	RegisterTypedLoadable(provider, LoadableKey("Books"), bookLoadable)
+	registeredBookLoadable := RegisterLoadable(provider, LoadableKey("Books"), bookLoadable)
 	
 	// Retrieve the loadable
-	retrievedLoadable := MustGetLoadable[UserID, *TypedUser, BookID, *TypedBook](provider, LoadableKey("Books"))
+	retrievedLoadable := GetRegisteredLoadable(provider, registeredBookLoadable)
 	
 	// Verify that it's the same loadable
 	if retrievedLoadable != bookLoadable {
@@ -22,10 +22,10 @@ func TestTypedLoadableProviderRegistration(t *testing.T) {
 	
 	// Register a HasOneLoadable
 	authorLoadable := EmptyHasOneLoadable[BookID, *TypedBook, UserID, *TypedUser]()
-	RegisterTypedHasOneLoadable(provider, LoadableKey("Authors"), authorLoadable)
+	registeredAuthorLoadable := RegisterHasOneLoadable(provider, LoadableKey("Authors"), authorLoadable)
 	
 	// Retrieve the HasOneLoadable
-	retrievedHasOneLoadable := MustGetHasOneLoadable[BookID, *TypedBook, UserID, *TypedUser](provider, LoadableKey("Authors"))
+	retrievedHasOneLoadable := GetRegisteredHasOneLoadable(provider, registeredAuthorLoadable)
 	
 	// Verify that it's the same HasOneLoadable
 	if retrievedHasOneLoadable != authorLoadable {
@@ -33,20 +33,34 @@ func TestTypedLoadableProviderRegistration(t *testing.T) {
 	}
 }
 
-// TestTypedLoadableProviderPanic tests that the provider panics when there's a type mismatch
-func TestTypedLoadableProviderPanic(t *testing.T) {
+// TestTypeSafetyAtCompileTime demonstrates that type safety is enforced at compile time
+func TestTypeSafetyAtCompileTime(t *testing.T) {
+	// This test doesn't actually run any code
+	// It's just to demonstrate compile-time type safety
+	
+	// Example: Type mismatch between RegisteredLoadable and RegisteredHasOneLoadable
+	/*
 	provider := NewTypedLoadableProvider()
 	
-	// Register a loadable with the wrong type
+	// Register a loadable
 	bookLoadable := EmptyLoadable[UserID, *TypedUser, BookID, *TypedBook]()
-	provider.RegisterLoadable("Authors", bookLoadable) // Using the untyped RegisterLoadable
+	registeredBookLoadable := RegisterLoadable(provider, LoadableKey("Books"), bookLoadable)
 	
-	// This should panic because we're trying to retrieve a HasOneLoadable but registered a Loadable
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("The code did not panic")
-		}
-	}()
+	// This would cause a compile error because we're trying to use GetRegisteredHasOneLoadable with a RegisteredLoadable
+	_ = GetRegisteredHasOneLoadable(provider, registeredBookLoadable)
+	*/
 	
-	_ = MustGetHasOneLoadable[BookID, *TypedBook, UserID, *TypedUser](provider, LoadableKey("Authors"))
+	// Example: Using an unregistered loadable
+	/*
+	provider := NewTypedLoadableProvider()
+	
+	// Create an unregistered loadable (using NotRegistered phantom type)
+	unregisteredLoadable := RegisteredLoadable[NotRegistered, UserID, *TypedUser, BookID, *TypedBook]{
+		Key: LoadableKey("Books"),
+		Loadable: EmptyLoadable[UserID, *TypedUser, BookID, *TypedBook](),
+	}
+	
+	// This would cause a compile error because GetRegisteredLoadable requires a RegisteredLoadable with Registered type
+	_ = GetRegisteredLoadable(provider, unregisteredLoadable)
+	*/
 }

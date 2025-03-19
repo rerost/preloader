@@ -13,6 +13,7 @@ type TypedUser struct {
 	Name string
 	
 	provider *preloader.TypedLoadableProvider
+	booksLoadable preloader.RegisteredLoadable[preloader.Registered, UserID, *TypedUser, BookID, *TypedBook]
 }
 
 func (u *TypedUser) GetResourceID() UserID {
@@ -23,9 +24,16 @@ func (u *TypedUser) SetProvider(provider *preloader.TypedLoadableProvider) {
 	u.provider = provider
 }
 
+// RegisterBooksLoadable registers the Books loadable for this user
+func (u *TypedUser) RegisterBooksLoadable(
+	loadable preloader.RegisteredLoadable[preloader.Registered, UserID, *TypedUser, BookID, *TypedBook],
+) {
+	u.booksLoadable = loadable
+}
+
 // Books returns the books for this user
 func (u *TypedUser) Books(ctx context.Context) ([]*TypedBook, error) {
-	loadable := preloader.MustGetLoadable[UserID, *TypedUser, BookID, *TypedBook](u.provider, preloader.LoadableKey("Books"))
+	loadable := preloader.GetRegisteredLoadable(u.provider, u.booksLoadable)
 	return loadable.Load(ctx, u)
 }
 
@@ -38,6 +46,8 @@ type TypedBook struct {
 	PlaceID  PlaceID
 	
 	provider *preloader.TypedLoadableProvider
+	authorLoadable preloader.RegisteredHasOneLoadable[preloader.Registered, BookID, *TypedBook, UserID, *TypedUser]
+	placeLoadable  preloader.RegisteredHasOneLoadable[preloader.Registered, BookID, *TypedBook, PlaceID, *Place]
 }
 
 func (b *TypedBook) GetResourceID() BookID {
@@ -48,15 +58,29 @@ func (b *TypedBook) SetProvider(provider *preloader.TypedLoadableProvider) {
 	b.provider = provider
 }
 
+// RegisterAuthorLoadable registers the Author loadable for this book
+func (b *TypedBook) RegisterAuthorLoadable(
+	loadable preloader.RegisteredHasOneLoadable[preloader.Registered, BookID, *TypedBook, UserID, *TypedUser],
+) {
+	b.authorLoadable = loadable
+}
+
+// RegisterPlaceLoadable registers the Place loadable for this book
+func (b *TypedBook) RegisterPlaceLoadable(
+	loadable preloader.RegisteredHasOneLoadable[preloader.Registered, BookID, *TypedBook, PlaceID, *Place],
+) {
+	b.placeLoadable = loadable
+}
+
 // Author returns the author of this book
 func (b *TypedBook) Author(ctx context.Context) (*TypedUser, error) {
-	loadable := preloader.MustGetHasOneLoadable[BookID, *TypedBook, UserID, *TypedUser](b.provider, preloader.LoadableKey("Authors"))
+	loadable := preloader.GetRegisteredHasOneLoadable(b.provider, b.authorLoadable)
 	return loadable.Load(ctx, b)
 }
 
 // Place returns the place of this book
 func (b *TypedBook) Place(ctx context.Context) (*Place, error) {
-	loadable := preloader.MustGetHasOneLoadable[BookID, *TypedBook, PlaceID, *Place](b.provider, preloader.LoadableKey("Places"))
+	loadable := preloader.GetRegisteredHasOneLoadable(b.provider, b.placeLoadable)
 	return loadable.Load(ctx, b)
 }
 
@@ -113,11 +137,27 @@ func typeSafeExample() {
 	provider := preloader.NewTypedLoadableProvider()
 	
 	// Create and register loadables
-	// If we forget to register a loadable, we'll get a compile-time error
 	bookLoadable := preloader.EmptyLoadable[UserID, *TypedUser, BookID, *TypedBook]()
-	preloader.RegisterTypedLoadable(provider, preloader.LoadableKey("Books"), bookLoadable)
+	registeredBookLoadable := preloader.RegisterLoadable(provider, preloader.LoadableKey("Books"), bookLoadable)
 	
-	// This would cause a compile-time error if we try to use Author() without registering the Authors loadable
 	authorLoadable := preloader.EmptyHasOneLoadable[BookID, *TypedBook, UserID, *TypedUser]()
-	preloader.RegisterTypedHasOneLoadable(provider, preloader.LoadableKey("Authors"), authorLoadable)
+	registeredAuthorLoadable := preloader.RegisterHasOneLoadable(provider, preloader.LoadableKey("Authors"), authorLoadable)
+	
+	// Create a user and register the loadable
+	user := &TypedUser{ID: 1, Name: "Test User"}
+	user.SetProvider(provider)
+	user.RegisterBooksLoadable(registeredBookLoadable)
+	
+	// This will compile because the loadable is registered
+	books, _ := user.Books(context.Background())
+	fmt.Println("Books:", books)
+	
+	// Create a book and register the loadable
+	book := &TypedBook{ID: 1, Title: "Test Book"}
+	book.SetProvider(provider)
+	book.RegisterAuthorLoadable(registeredAuthorLoadable)
+	
+	// This will compile because the loadable is registered
+	author, _ := book.Author(context.Background())
+	fmt.Println("Author:", author)
 }
