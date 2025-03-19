@@ -22,19 +22,20 @@ type PlaceRepository interface {
 }
 
 func NewUserRepository(
-	booksLoadable preloader.Loadable[UserID, *User, BookID, *Book],
+	provider preloader.LoadableProvider,
 ) *userRepository {
 	return &userRepository{
+		provider: provider,
 		m: map[UserID]*User{
 			1: {
-				ID:    1,
-				Name:  "Alice",
-				Books: booksLoadable,
+				ID:       1,
+				Name:     "Alice",
+				provider: provider,
 			},
 			2: {
-				ID:    2,
-				Name:  "Bob",
-				Books: booksLoadable,
+				ID:       2,
+				Name:     "Bob",
+				provider: provider,
 			},
 		},
 	}
@@ -43,15 +44,17 @@ func NewUserRepository(
 var _ UserRepository = &userRepository{}
 
 type userRepository struct {
-	m map[UserID]*User
+	m        map[UserID]*User
+	provider preloader.LoadableProvider
 }
 
 func (u *userRepository) List(ctx context.Context, ids []UserID) ([]*User, error) {
 	users := make([]*User, len(ids))
 	for i, id := range ids {
 		users[i] = &User{
-			ID:   id,
-			Name: fmt.Sprintf("User %d", id),
+			ID:       id,
+			Name:     fmt.Sprintf("User %d", id),
+			provider: u.provider,
 		}
 	}
 	return users, nil
@@ -67,9 +70,10 @@ func (u *userRepository) All() ([]*User, error) {
 }
 
 func NewBookRepository(
-	placeLoadable preloader.HasOneLoadable[BookID, *Book, PlaceID, *Place],
+	provider preloader.LoadableProvider,
 ) *bookRepository {
 	return &bookRepository{
+		provider: provider,
 		m: map[BookID][]*Book{
 			1: {
 				&Book{
@@ -77,24 +81,23 @@ func NewBookRepository(
 					Title:    "テスト本1",
 					AuthorID: 1,
 					PlaceID:  1,
-					Place:    placeLoadable,
+					provider: provider,
 				},
 				&Book{
 					ID:       2,
 					Title:    "テスト本2",
 					AuthorID: 1,
 					PlaceID:  2,
-					Place:    placeLoadable,
+					provider: provider,
 				},
 			},
 		},
-		authorLoadable: preloader.EmptyHasOneLoadable[BookID, *Book, UserID, *User](),
 	}
 }
 
 type bookRepository struct {
-	m              map[BookID][]*Book
-	authorLoadable preloader.HasOneLoadable[BookID, *Book, UserID, *User]
+	m        map[BookID][]*Book
+	provider preloader.LoadableProvider
 }
 
 var _ BookRepository = &bookRepository{}
@@ -126,31 +129,31 @@ func (b *bookRepository) ByUsers(ctx context.Context, userIDs []UserID) (map[Use
 	return res, nil
 }
 
-func (b *bookRepository) InjectAuthorLoadable(authorLoadable preloader.HasOneLoadable[BookID, *Book, UserID, *User]) {
-	for _, book := range b.m {
-		for _, b := range book {
-			b.Author = authorLoadable
-		}
-	}
-}
+// InjectAuthorLoadable method is no longer needed with the LoadableProvider pattern
 
-func NewPlaceRepository() *placeRepository {
+func NewPlaceRepository(
+	provider preloader.LoadableProvider,
+) *placeRepository {
 	return &placeRepository{
+		provider: provider,
 		m: map[PlaceID]*Place{
 			1: {
-				ID:   1,
-				Name: "Tokyo",
+				ID:       1,
+				Name:     "Tokyo",
+				provider: provider,
 			},
 			2: {
-				ID:   2,
-				Name: "Osaka",
+				ID:       2,
+				Name:     "Osaka",
+				provider: provider,
 			},
 		},
 	}
 }
 
 type placeRepository struct {
-	m map[PlaceID]*Place
+	m        map[PlaceID]*Place
+	provider preloader.LoadableProvider
 }
 
 var _ PlaceRepository = &placeRepository{}
@@ -158,7 +161,11 @@ var _ PlaceRepository = &placeRepository{}
 func (p *placeRepository) List(ctx context.Context, ids []PlaceID) ([]*Place, error) {
 	places := make([]*Place, len(ids))
 	for i, id := range ids {
-		places[i] = p.m[id]
+		places[i] = &Place{
+			ID:       id,
+			Name:     p.m[id].Name,
+			provider: p.provider,
+		}
 	}
 	return places, nil
 }

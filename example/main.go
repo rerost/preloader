@@ -17,19 +17,27 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	placeRepository := NewPlaceRepository()
+	// Create a shared LoadableProvider
+	provider := preloader.NewLoadableProvider()
+	
+	// Initialize repositories with the provider
+	placeRepository := NewPlaceRepository(provider)
+	bookRepository := NewBookRepository(provider)
+	userRepo := NewUserRepository(provider)
+	
+	// Create and register loadables
 	placeLoadable := preloader.NewHasOneLoadable("Places", BookToPlace, placeRepository.List, true)
-
-	bookRepository := NewBookRepository(placeLoadable)
+	provider.RegisterLoadable("Places", placeLoadable)
+	
 	bookLoader := UsersToBooksLoader{bookRepository}
 	bookLoadable := preloader.NewLoadable("Books", bookLoader.IDs, bookRepository.List)
-
-	userRepo := NewUserRepository(bookLoadable)
+	provider.RegisterLoadable("Books", bookLoadable)
+	
 	authorLoadable := preloader.NewHasOneLoadable("Authors", BookToAuthor, userRepo.List, true)
-	bookRepository.InjectAuthorLoadable(authorLoadable)
-
+	provider.RegisterLoadable("Authors", authorLoadable)
+	
 	users, _ := userRepo.All()
-
+	
 	// Preload
 	if err := preloader.Preload(
 		ctx,
@@ -41,19 +49,19 @@ func run(ctx context.Context) error {
 	); err != nil {
 		return err
 	}
-
+	
 	// Print
 	for _, user := range users {
-		books, err := user.Books.Load(ctx, user)
+		books, err := user.Books(ctx)
 		if err != nil {
 			return err
 		}
 		for _, book := range books {
-			place, err := book.Place.Load(ctx, book)
+			place, err := book.Place(ctx)
 			if err != nil {
 				return err
 			}
-			author, err := book.Author.Load(ctx, book)
+			author, err := book.Author(ctx)
 			if err != nil {
 				return err
 			}
