@@ -14,7 +14,7 @@ ActiveRecordの`users.preload(books: [:place, :author]` のようなことをGo�
 参考: https://github.com/wantedly/computed_model
 
 ## TODO
-- [x]  `Preload(users, "Books", "Books.Place", "Books.Author")` をどうするか
+- [x] `Preload(users, "Books", "Books.Place", "Books.Author")` をどうするか
 - [x] HasOneの場合、使い勝手が悪い
 - [ ] LoadableのInjectが結構面倒。全員に配布するのが面倒
 
