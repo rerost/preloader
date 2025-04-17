@@ -59,10 +59,10 @@ func run(ctx context.Context) error {
 		AddLoadable("Place", placeLoadable).
 		AddLoadable("Author", authorLoadable)
 	
-	if err := userBuilder.Build(&userRepo); err != nil {
+	if err := userBuilder.Build(userRepo); err != nil {
 		return err
 	}
-	if err := bookBuilder.Build(&bookRepository); err != nil {
+	if err := bookBuilder.Build(bookRepository); err != nil {
 		return err
 	}
 	
@@ -108,7 +108,7 @@ func run(ctx context.Context) error {
 
 
 type UsersToBooksLoader struct {
-	bookRepository BookRepository
+	bookRepository *BookRepository
 }
 
 func (u *UsersToBooksLoader) IDs(ctx context.Context, users []*User) (map[UserID][]BookID, error) {
