@@ -16,10 +16,19 @@ ActiveRecordの`users.preload(books: [:place, :author]` のようなことをGo�
 ## TODO
 - [x] `Preload(users, "Books", "Books.Place", "Books.Author")` をどうするか
 - [x] HasOneの場合、使い勝手が悪い
-- [ ] LoadableのInjectが結構面倒。構造体に渡したり、相互参照があるときに面倒になってくる
+- [x] LoadableのInjectが結構面倒。構造体に渡したり、相互参照があるときに面倒になってくる
+
+## dynoproxy
+`go-dyno`を使用して、LoadableのInjectを簡素化するパッケージを追加しました。詳細は[dynoproxy/README.md](dynoproxy/README.md)を参照してください。
 
 ## Example
 ```bash
 cd example
 go run main.go repository.go resource.go
+```
+
+## dynoproxy Example
+```bash
+cd dynoproxy/example
+go run main.go
 ```
