@@ -43,6 +43,23 @@ type LoadableHandler[ParentID comparable, Parent preloader.Resource[ParentID], N
 }
 
 func (h *LoadableHandler[ParentID, Parent, NodeID, Node]) Handle(m reflect.Method, values []reflect.Value) []reflect.Value {
+	if m.Name == "Child" {
+		childMethod := reflect.ValueOf(h.Impl).MethodByName(m.Name)
+		
+		var args []reflect.Value
+		if len(values) == 2 && values[1].Kind() == reflect.Slice {
+			slice := values[1]
+			args = make([]reflect.Value, slice.Len())
+			for i := 0; i < slice.Len(); i++ {
+				args[i] = slice.Index(i)
+			}
+		}
+		
+		result := childMethod.Call(args)
+		h.Impl = result[0].Interface().(preloader.Loadable[ParentID, Parent, NodeID, Node])
+		proxy, _ := dyno.Dynamic[preloader.Loadable[ParentID, Parent, NodeID, Node]](h.Handle)
+		return []reflect.Value{reflect.ValueOf(proxy)}
+	}
 	return reflect.ValueOf(h.Impl).MethodByName(m.Name).Call(values)
 }
 
@@ -51,6 +68,23 @@ type HasOneLoadableHandler[ParentID comparable, Parent preloader.Resource[Parent
 }
 
 func (h *HasOneLoadableHandler[ParentID, Parent, NodeID, Node]) Handle(m reflect.Method, values []reflect.Value) []reflect.Value {
+	if m.Name == "Child" {
+		childMethod := reflect.ValueOf(h.Impl).MethodByName(m.Name)
+		
+		var args []reflect.Value
+		if len(values) == 2 && values[1].Kind() == reflect.Slice {
+			slice := values[1]
+			args = make([]reflect.Value, slice.Len())
+			for i := 0; i < slice.Len(); i++ {
+				args[i] = slice.Index(i)
+			}
+		}
+		
+		result := childMethod.Call(args)
+		h.Impl = result[0].Interface().(preloader.HasOneLoadable[ParentID, Parent, NodeID, Node])
+		proxy, _ := dyno.Dynamic[preloader.HasOneLoadable[ParentID, Parent, NodeID, Node]](h.Handle)
+		return []reflect.Value{reflect.ValueOf(proxy)}
+	}
 	return reflect.ValueOf(h.Impl).MethodByName(m.Name).Call(values)
 }
 
